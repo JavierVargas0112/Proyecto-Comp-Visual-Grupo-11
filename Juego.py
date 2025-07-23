@@ -3,6 +3,19 @@ import random
 import SeguimientoManos as sm
 import os
 import imutils
+import time
+
+def mostrar_imagen_victoria(frame, imagen, al, an):
+    """Función para mostrar imágenes de victoria redimensionadas"""
+    try:
+        img_redimensionada = imutils.resize(imagen, width=300, height=200)
+        alig, anig, c = img_redimensionada.shape
+        # Verificar que la imagen quepa en el frame
+        if 70 + alig <= al and 180 + anig <= an:
+            frame[70: 70 + alig, 180: 180 + anig] = img_redimensionada
+    except Exception as e:
+        print(f"Error al mostrar imagen de victoria: {e}")
+    return frame
 
 fs = False
 fu = False
@@ -15,25 +28,28 @@ femp = False
 fder = False
 fizq = False
 conteo = 0
+tiempo_inicio = 0
+tiempo_conteo = 0
 
 path = '.'
 images = []
 clases = []
-lista = os.listdir(path)
+
+# Orden específico requerido para el juego
+orden_requerido = ['0.png', '1.png', '2.png', 'papel.png', 'piedra.png', 'tijera.png', 'V1.png', 'V2.png', 'V3.png']
 
 faltantes = []
-requeridas = ['0.png','1.png','2.png','papel.png','piedra.png','tijera.png','V1.png','V2.png','V3.png']
-for req in requeridas:
-    if req not in lista:
+for req in orden_requerido:
+    if not os.path.exists(os.path.join(path, req)):
         faltantes.append(req)
-
-for lis in lista:
-    if lis.endswith('.png'):
-        imgdb = cv2.imread(f'{path}/{lis}')
+    else:
+        imgdb = cv2.imread(f'{path}/{req}')
         if imgdb is None:
-            print(f"Error: No se pudo cargar la imagen {lis}")
-        images.append(imgdb)
-        clases.append(os.path.splitext(lis)[0])
+            print(f"Error: No se pudo cargar la imagen {req}")
+            faltantes.append(req)
+        else:
+            images.append(imgdb)
+            clases.append(os.path.splitext(req)[0])
 
 if faltantes:
     print("ADVERTENCIA: Faltan las siguientes imágenes necesarias para el juego:")
@@ -41,7 +57,7 @@ if faltantes:
         print(f"- {f}")
     print("El juego podría no funcionar correctamente.")
 
-print(clases)
+print("Imágenes cargadas en orden:", clases)
 
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
@@ -66,61 +82,60 @@ while True:
 
     frame = cv2.flip(frame,1)
 
-    # Mostrar instrucciones en la parte superior
-    cv2.rectangle(frame, (0,0), (an,30), (0,0,0), -1)
-    cv2.putText(frame, ayuda, (10, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 1)
-
     frame = detector.encontrarmanos(frame, dibujar=True)
     lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color = [0,255,0])
+
+    # Mostrar instrucciones en la parte superior (después de la detección)
+    cv2.rectangle(frame, (0,0), (an,35), (0,0,0), -1)
+    cv2.putText(frame, ayuda, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255,255,255), 1)
 
     if jug == 1:
         cv2.line(frame, (cx,0), (cx,480), (0,255,0), 2)
 
-        cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
-        cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71,(0, 255, 0), 2)
+        cv2.rectangle(frame, (245, 40), (380, 75), (0, 0, 0), -1)
+        cv2.putText(frame, '1 JUGADOR', (250, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.71,(0, 255, 0), 2)
 
         cv2.rectangle(frame, (145, 425), (465, 460), (0, 0, 0), -1)
         cv2.putText(frame, 'PRESIONA S PARA EMPEZAR', (150, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
 
         if t == 83 or t == 115 or fs == True:
             fs = True
+            if tiempo_inicio == 0:
+                tiempo_inicio = time.time()
+                
+            tiempo_actual = time.time()
+            tiempo_transcurrido = tiempo_actual - tiempo_inicio
+            
             if len(lista1) != 0:
                 x1, y1 = lista1[9][1:]
 
                 if conteo <= 2:
-                    img = images[conteo]
-                    img = imutils.resize(img, width=240, height=240)
-                    ali, ani, c = img.shape
+                    # Cuenta regresiva automática cada 1 segundo
+                    if tiempo_transcurrido >= (conteo + 1) * 1.0:
+                        conteo += 1
+                        print(f"Conteo automático: {conteo}")
+                    
+                    if conteo <= 2:
+                        img = images[conteo]
+                        img = imutils.resize(img, width=240, height=240)
+                        ali, ani, c = img.shape
+                        
+                        print(f"Mostrando imagen del conteo {conteo}: {clases[conteo]}")
 
-                    if x1 < cx:
-                        fizq = True
-                        fder = False
-                        frame[130: 130 + ali, 350: 350 + ani] = img
-
-                        if y1 < cy - 40 and fd == False:
-                            fu = True
-                            cv2.circle(frame, (cx, cy), 5, (255, 255, 0), -1)
-
-                        elif y1 > cy - 40 and fu == True:
-                            conteo = conteo + 1
-                            fu = False
-
-                    elif x1 > cx:
-                        fder = True
-                        fizq = False
-                        frame[130: 130 + ali, 30: 30 + ani] = img
-
-                        if y1 < cy - 40 and fd == False:
-                            fu = True
-                            cv2.circle(frame, (cx,cy), 5, (255,255,0), -1)
-
-                        elif y1 > cy - 40 and fu == True:
-                            conteo = conteo + 1
-                            fu = False
+                        if x1 < cx:
+                            fizq = True
+                            fder = False
+                            frame[130: 130 + ali, 350: 350 + ani] = img
+                        elif x1 > cx:
+                            fder = True
+                            fizq = False
+                            frame[130: 130 + ali, 30: 30 + ani] = img
                 elif conteo == 3:
+                    print("Iniciando fase de juego...")
                     if fj == False and fr == False:
                         juego = random.randint(3,5)
                         fj = True
+                        print(f"IA eligió: {clases[juego]} (índice {juego})")
 
                     if fizq == True and fder == False:
                         img = images[juego]
@@ -201,11 +216,7 @@ while True:
                         # Mostramos ganador
                         # IA
                         if fgia == True:
-                            # Mostramos
-                            gan = images[6]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[6], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -223,11 +234,7 @@ while True:
 
                         # USUARIO
                         elif fgus == True:
-                            # Mostramos
-                            gan = images[7]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[7], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -245,11 +252,7 @@ while True:
 
                         # EMPATE
                         elif femp == True:
-                            # Mostramos
-                            gan = images[8]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[8], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -385,11 +388,7 @@ while True:
                         # Mostramos ganador
                         # IA
                         if fgia == True:
-                            # Mostramos
-                            gan = images[6]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[6], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -407,11 +406,7 @@ while True:
 
                         # USUARIO
                         elif fgus == True:
-                            # Mostramos
-                            gan = images[7]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[7], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -429,11 +424,7 @@ while True:
 
                         # EMPATE
                         elif femp == True:
-                            # Mostramos
-                            gan = images[8]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
+                            frame = mostrar_imagen_victoria(frame, images[8], al, an)
 
                             # Reset
                             if t == 82 or t == 114:
@@ -459,8 +450,8 @@ while True:
         cv2.line(frame, (cx, 240), (cx, 480), (0, 255, 0), 2)
 
         # Mostramos jugadores
-        cv2.rectangle(frame, (245, 25), (408, 60), (0, 0, 0), -1)
-        cv2.putText(frame, '2 JUGADORES', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (255, 0, 0), 2)
+        cv2.rectangle(frame, (245, 40), (408, 75), (0, 0, 0), -1)
+        cv2.putText(frame, '2 JUGADORES', (250, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (255, 0, 0), 2)
 
         # Mensaje inicio
         cv2.rectangle(frame, (145, 425), (465, 460), (0, 0, 0), -1)
@@ -472,8 +463,8 @@ while True:
     # 0 Jugadores
     elif jug == 0:
         # Mostramos jugadores
-        cv2.rectangle(frame, (225, 25), (388, 60), (0, 0, 0), -1)
-        cv2.putText(frame, '0 JUGADORES', (230, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
+        cv2.rectangle(frame, (225, 40), (388, 75), (0, 0, 0), -1)
+        cv2.putText(frame, '0 JUGADORES', (230, 65), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
 
         # Mensaje inicio
         cv2.rectangle(frame, (115, 425), (480, 460), (0, 0, 0), -1)
